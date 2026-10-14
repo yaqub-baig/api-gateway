@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: gateway-api
+
+server:
+  # Only Apache (same machine) talks to the gateway; it is not reachable from outside.
+  address: 127.0.0.1
+  port: 8070
+  shutdown: graceful
+
+management:
+  server:
+    # Health endpoint on a separate loopback-only port, never on the public path.
+    address: 127.0.0.1
+    port: 8071
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+gateway:
+  # name -> base URL. The name is the public path prefix: https://api.autoadda.ae/<name>/...
+  upstreams:
+    identity: http://127.0.0.1:8010
+    garage: http://127.0.0.1:8020
+    vehicle: http://127.0.0.1:8030
+    quote: http://127.0.0.1:8050
+    part: http://127.0.0.1:8060
+    otherservice: http://127.0.0.1:9010
+
+  allowed-origins:
+    - https://autoadda.ae
+    - https://www.autoadda.ae
+    - https://panel.autoadda.ae
+    - http://localhost:3000
+
+  # Matched (case-insensitive, unanchored at the end) against the normalised path.
+  # Same rule as the Apache block-internal.conf, with the service prefix in front.
+  deny-pattern: "(?i)^/[^/]+/api/v1/(auth/(send-sms|send-email|update/role|remove/role)|notifications?/(send|test)|swagger-ui|v3/api-docs|actuator)"
+
+logging:
+  level:
+    com.autoadda.gateway: INFO
