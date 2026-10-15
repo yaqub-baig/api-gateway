@@ -1,6 +1,11 @@
 spring:
   application:
     name: gateway-api
+  web:
+    resources:
+      # No default static/webjar handlers (/webjars/**, /**). The swagger-ui jar is served
+      # only under /_docs/ui, behind DocsAuthFilter.
+      add-mappings: false
 
 server:
   # Only Apache (same machine) talks to the gateway; it is not reachable from outside.
@@ -33,10 +38,26 @@ gateway:
     - https://www.autoadda.ae
     - https://panel.autoadda.ae
     - http://localhost:3000
+    # The gateway's own host: the /_docs page calls /<service>/... from it. Behind Apache the
+    # gateway sees plain http, so these same-origin calls look cross-origin to it.
+    - https://api.autoadda.ae
 
   # Matched (case-insensitive, unanchored at the end) against the normalised path.
   # Same rule as the Apache block-internal.conf, with the service prefix in front.
   deny-pattern: "(?i)^/[^/]+/api/v1/(auth/(send-sms|send-email|update/role|remove/role)|notifications?/(send|test)|swagger-ui|v3/api-docs|actuator)"
+
+  # Private combined Swagger UI at /_docs. OFF by default. Never put the password here;
+  # enable it on the server with a separate config file (see README).
+  docs:
+    enabled: false
+    username: docs
+    password: ""
+    api-docs-paths:
+      - /api/v1/v3/api-docs
+      - /v3/api-docs
+    cache-seconds: 60
+    fetch-timeout-seconds: 3
+    max-spec-bytes: 5MB
 
 logging:
   level:

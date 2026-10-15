@@ -22,14 +22,60 @@ Example: `https://api.autoadda.ae/garage/api/v1/garages/search/paginated` reache
 ## What it does (version 1)
 
 - Routes by service prefix (`RoutesConfig`).
-- CORS in one place (`CorsConfig`): only the origins in `gateway.allowed-origins`. A request from another browser origin gets 403. Preflight is answered here. If a service also sends `Access-Control-Allow-Origin`, the gateway keeps its own value (no duplicate header).
+- CORS in one place (`CorsConfig`): only the origins in `gateway.allowed-origins` (this includes `https://api.autoadda.ae` itself, because behind Apache the gateway sees plain http and would otherwise treat same-origin calls from `/_docs` as cross-origin). A request from another browser origin gets 403. Preflight is answered here. If a service also sends `Access-Control-Allow-Origin`, the gateway keeps its own value (no duplicate header).
 - Blocks internal endpoints (`PathGuardFilter`): role changes, SMS/email send, notification send/test, swagger, api-docs, actuator. Responds 404. The path is decoded and normalised before matching (`%75pdate`, `//`, `;x=1`, `/./`, `/../`).
+- Private API docs at `/_docs/` (off by default, see below).
 - Not in version 1: JWT checks, rate limiting. The five services without authentication still trust the caller. That comes in a later phase.
+
+## API docs (`/_docs`)
+
+One Swagger UI page for all six services, served by the gateway itself at `https://api.autoadda.ae/_docs/`, with a dropdown to pick the service. **It is OFF by default** and, when on, is protected by HTTP Basic auth.
+
+- `GET /_docs/` is the page. The swagger-ui files come from the `org.webjars:swagger-ui` jar (served under `/_docs/ui/`). Nothing is loaded from other hosts, and the validator badge is off.
+- `GET /_docs/spec/<service>` fetches the service's OpenAPI JSON from its loopback upstream. It tries each path in `api-docs-paths` in order and uses the first one that returns a 200 OpenAPI JSON. The result is cached for `cache-seconds`. If the service is down the answer is 502 `{"error":"upstream_unavailable"}`, and an unknown name gets 404.
+- The spec's top-level `servers` is replaced with `/<service>`, so **"Try it out" goes through the gateway**: `https://api.autoadda.ae/<service>/api/v1/...`. It therefore passes the path guard and CORS like any public request, which makes it a real test of the public surface. If the service publishes a context path in its server URL (`http://127.0.0.1:8020/api/v1`), that path is kept (`/garage/api/v1`). Paths, components and security schemes are untouched, so **Authorize** with a JWT works.
+- After 10 wrong passwords from one client IP in 15 minutes, that IP gets 429 for the rest of the window. The IP is the last `X-Forwarded-For` entry, the one Apache adds.
+- `/_docs` responses carry `Cache-Control: no-store`, a strict `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex`.
+- The public `/<service>/.../swagger-ui` and `/v3/api-docs` paths stay blocked as before.
+
+Settings under `gateway.docs`:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Serve `/_docs` at all. |
+| `username` | `docs` | Basic-auth user. |
+| `password` | empty | Basic-auth password. **If it is blank, docs stay off** even with `enabled: true` (an error is logged). |
+| `api-docs-paths` | `/api/v1/v3/api-docs`, `/v3/api-docs` | Paths tried on each upstream, in order. |
+| `cache-seconds` | `60` | How long a fetched spec is reused. |
+| `fetch-timeout-seconds` | `3` | Timeout per upstream fetch. |
+| `max-spec-bytes` | `5MB` | Larger specs are rejected. |
+
+To enable it on the server without a rebuild, keep a file **outside the repo** (`chmod 600`), for example `/home/adminautoadda/apps/gateway.yml`:
+
+```yaml
+gateway:
+  docs:
+    enabled: true
+    username: docs
+    password: <set on the server only>
+```
+
+and start the jar with `--spring.config.additional-location=file:/home/adminautoadda/apps/gateway.yml` (add it after `-jar ...` in the PM2 command, then `pm2 restart gateway`).
+
+> **Never commit the docs password** (or any other credential) to this repo. `application.yml` ships with docs off and an empty password on purpose.
+
+Quick check once enabled:
+
+```
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8070/_docs/                 # 401
+curl -s -o /dev/null -w '%{http_code}\n' -u docs:PASSWORD http://127.0.0.1:8070/_docs/ # 200
+curl -s -u docs:PASSWORD http://127.0.0.1:8070/_docs/spec/garage | head -c 300
+```
 
 ## Build and test
 
 ```
-mvn -B package          # runs PathGuardFilterTest as part of the build
+mvn -B package          # runs PathGuardFilterTest and the Docs*Test classes as part of the build
 ```
 
 The jar is `target/GatewayApi-0.0.1-SNAPSHOT.jar`.
