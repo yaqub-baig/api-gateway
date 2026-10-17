@@ -43,7 +43,7 @@ The gateway checks the access token identity-api issues (HS256, shared secret) o
 - `jwt-secret` must be the same secret identity-api signs with. **Never commit it.** A blank secret (or one shorter than 32 bytes) logs an error and turns the check off.
 - `public-paths`: `METHOD /pattern` entries (`ANY` for every method). Patterns use Spring path syntax: `*` is one segment, `**` the rest, and `{id:\d+}` a numeric id only (so `/garages/{id:\d+}` does not also open `/garages/search`). A request is public only when both its raw and its normalised path match, so `..` or percent-encoded spellings cannot borrow a public entry.
 - `role-rules`: `{pattern, role}`; any method on a matching path needs that role on top of a valid token (`ROLE_ADMIN` for the admin APIs).
-- `strip-role-prefix: true` sends `ADMIN` instead of `ROLE_ADMIN` in `X-User-Role`, if a service expects that.
+- `X-User-Role` is sent comma-separated without the `ROLE_` prefix (`ADMIN,GARAGE_OWNER`; `strip-role-prefix: true`, the default). quote-api is the only service that reads it.
 - Only paths that start with a configured service are checked. `/_docs` has its own auth, and the management port (`/actuator/health`) is not affected.
 - Tokens are never logged.
 

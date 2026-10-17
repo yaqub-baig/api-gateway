@@ -65,8 +65,10 @@ gateway:
   auth:
     mode: "off"
     jwt-secret: ""
-    # Send "ADMIN" instead of "ROLE_ADMIN" in X-User-Role, if a service expects that.
-    strip-role-prefix: false
+    # X-User-Role carries "ADMIN,GARAGE_OWNER" rather than "ROLE_ADMIN,ROLE_GARAGE_OWNER".
+    # quote-api is the only reader: its AuthorizationUtil accepts both, but two checks in
+    # BannerVendorController compare "ADMIN".equals(role) exactly.
+    strip-role-prefix: true
     # Any method on these needs the role, on top of a valid token.
     role-rules:
       - { pattern: "/identity/api/v1/auth/admin/**", role: ROLE_ADMIN }
@@ -117,9 +119,12 @@ gateway:
       - 'GET /part/api/v1/models/make/{id:\d+}'
       - GET /part/api/v1/products
       - POST /part/api/v1/products/search/paginated
-      # quote: banners on public pages
+      # quote: everything in quote-api's BannerPublicController (banner ids are strings)
       - GET /quote/api/v1/banners
       - GET /quote/api/v1/banners/page/*
+      - GET /quote/api/v1/banners/page/*/position/*
+      - POST /quote/api/v1/banners/*/impression
+      - POST /quote/api/v1/banners/*/click
       # vehicle: public listings and location pickers
       - GET /vehicle/api/v1/car-rental-listings/browse
       - 'GET /vehicle/api/v1/car-rental-listings/{id:\d+}'

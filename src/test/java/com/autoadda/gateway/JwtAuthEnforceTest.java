@@ -59,7 +59,7 @@ class JwtAuthEnforceTest {
                 .expectStatus().isOk();
         StubUpstream.Seen seen = ECHO.last("/api/v1/work-orders/by-garage/5?t=valid");
         assertEquals("42", seen.headers().get("x-auto-adda-id"), "client-sent id must be replaced");
-        assertEquals("ROLE_USER", seen.headers().get("x-user-role"), "client-sent role must be replaced");
+        assertEquals("USER", seen.headers().get("x-user-role"), "client-sent role must be replaced");
         assertNull(seen.headers().get("x-user-id"));
         // The token itself still reaches the service (identity-api checks it too).
         assertTrue(seen.headers().get("authorization").startsWith("Bearer ey"));
@@ -151,6 +151,14 @@ class JwtAuthEnforceTest {
     }
 
     @Test
+    void quotePublicBannerEndpointsNeedNoToken() {
+        client.get().uri("/quote/api/v1/banners/page/home/position/top").exchange().expectStatus().isOk();
+        client.post().uri("/quote/api/v1/banners/65f0c0ffee/impression").exchange().expectStatus().isOk();
+        client.post().uri("/quote/api/v1/banners/65f0c0ffee/click").exchange().expectStatus().isOk();
+        client.get().uri("/quote/api/v1/admin/banners").exchange().expectStatus().isUnauthorized();
+    }
+
+    @Test
     void uploadsArePublicOnEveryService() {
         client.get().uri("/vehicle/api/v1/uploads/2026/10/car.jpg").exchange().expectStatus().isOk();
         client.get().uri("/part/api/v1/mediafiles/9").exchange().expectStatus().isOk();
@@ -176,6 +184,19 @@ class JwtAuthEnforceTest {
     }
 
     // ---- roles ----
+
+    @Test
+    void quoteGetsRolesWithoutPrefix() {
+        client.get().uri("/quote/api/v1/admin/banners?t=q")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer "
+                        + TestTokens.token("1", java.util.Set.of("ROLE_ADMIN"), 60_000))
+                .header("X-User-Role", "ROLE_CUSTOMER")
+                .exchange()
+                .expectStatus().isOk();
+        // quote-api's AuthorizationUtil and its "ADMIN".equals(role) checks both accept this.
+        assertEquals("ADMIN", ECHO.last("/api/v1/admin/banners?t=q").headers().get("x-user-role"));
+    }
+
 
     @Test
     void adminPathsNeedTheAdminRole() {
