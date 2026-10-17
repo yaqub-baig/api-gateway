@@ -21,6 +21,9 @@
     <java.version>21</java.version>
     <spring-cloud.version>2025.0.0</spring-cloud.version>
     <swagger-ui.version>5.32.15</swagger-ui.version>
+    <nimbus-jose-jwt.version>10.10</nimbus-jose-jwt.version>
+    <!-- Same version as identity-api, test scope only. -->
+    <jjwt.version>0.11.5</jjwt.version>
   </properties>
 
   <dependencies>
@@ -39,8 +42,33 @@
       <version>${swagger-ui.version}</version>
     </dependency>
     <dependency>
+      <!-- Verifies the HS256 access tokens identity-api issues. -->
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+      <version>${nimbus-jose-jwt.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Test only: mint tokens exactly the way identity-api does, to prove compatibility. -->
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-api</artifactId>
+      <version>${jjwt.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-impl</artifactId>
+      <version>${jjwt.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.jsonwebtoken</groupId>
+      <artifactId>jjwt-jackson</artifactId>
+      <version>${jjwt.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

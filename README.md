@@ -25,7 +25,40 @@ Example: `https://api.autoadda.ae/garage/api/v1/garages/search/paginated` reache
 - CORS in one place (`CorsConfig`): only the origins in `gateway.allowed-origins` (this includes `https://api.autoadda.ae` itself, because behind Apache the gateway sees plain http and would otherwise treat same-origin calls from `/_docs` as cross-origin). A request from another browser origin gets 403. Preflight is answered here. If a service also sends `Access-Control-Allow-Origin`, the gateway keeps its own value (no duplicate header).
 - Blocks internal endpoints (`PathGuardFilter`): role changes, SMS/email send, notification send/test, swagger, api-docs, actuator. Responds 404. The path is decoded and normalised before matching (`%75pdate`, `//`, `;x=1`, `/./`, `/../`).
 - Private API docs at `/_docs/` (off by default, see below).
-- Not in version 1: JWT checks, rate limiting. The five services without authentication still trust the caller. That comes in a later phase.
+- JWT check on the service routes, and the caller's identity passed to the services from the token (`JwtAuthFilter`, off by default, see "Authentication").
+- Not done yet: rate limiting on the service routes.
+
+## Authentication (`gateway.auth`)
+
+The gateway checks the access token identity-api issues (HS256, shared secret) on every `/<service>/...` request, except a list of public paths. **It is off by default.**
+
+**Why the identity headers matter:** the services take the caller's user id from the `X-Auto-Adda-Id` header. Before this, clients set it themselves, so anyone could act as any user. With a valid token the gateway now **removes any client-sent `X-Auto-Adda-Id`, `X-User-Role`, `X-User-Id`, `X-User-Roles` and sets `X-Auto-Adda-Id` (the token's `userId`) and `X-User-Role` (its roles) itself.** Services can trust these headers only because the gateway sets them, so the services must stay reachable through the gateway only (bound to 127.0.0.1 or firewalled).
+
+| `mode` | What happens |
+|---|---|
+| `off` | No checks, nothing changed. |
+| `report` | Never blocks. Logs `would-401` / `would-403` and `x-auto-adda-id mismatch` lines. Identity headers are replaced only when the token is valid; requests without a valid token go through exactly as before. |
+| `enforce` | Protected path without a valid token: `401 {"error":"unauthorized"}`. Missing role: `403`. Public paths are served anonymously: client identity headers are removed, and a bad or expired token is ignored, not rejected (so a stale token in the browser does not bounce a visitor off a public page). |
+
+- `jwt-secret` must be the same secret identity-api signs with. **Never commit it.** A blank secret (or one shorter than 32 bytes) logs an error and turns the check off.
+- `public-paths`: `METHOD /pattern` entries (`ANY` for every method). Patterns use Spring path syntax: `*` is one segment, `**` the rest, and `{id:\d+}` a numeric id only (so `/garages/{id:\d+}` does not also open `/garages/search`). A request is public only when both its raw and its normalised path match, so `..` or percent-encoded spellings cannot borrow a public entry.
+- `role-rules`: `{pattern, role}`; any method on a matching path needs that role on top of a valid token (`ROLE_ADMIN` for the admin APIs).
+- `strip-role-prefix: true` sends `ADMIN` instead of `ROLE_ADMIN` in `X-User-Role`, if a service expects that.
+- Only paths that start with a configured service are checked. `/_docs` has its own auth, and the management port (`/actuator/health`) is not affected.
+- Tokens are never logged.
+
+Enable on the server in the same out-of-repo file as the docs settings (mode 600):
+
+```yaml
+gateway:
+  auth:
+    mode: report          # then enforce, after reviewing the logs
+    jwt-secret: <same secret as identity-api, set on the server only>
+```
+
+Rollout: run `report` for a few days and check `grep -E 'would-40|mismatch' ~/.pm2/logs/gateway-out.log`. Add missing public paths or fix the app calls, then switch to `enforce` and `pm2 restart gateway`. To roll back, switch to `report`. No rebuild is needed either way. Quote `mode: "off"` in YAML, since a bare `off` is read as a boolean.
+
+The default public list in `application.yml` was built from the website, panel and mobile-app endpoint audits (2026-10-17).
 
 ## API docs (`/_docs`)
 

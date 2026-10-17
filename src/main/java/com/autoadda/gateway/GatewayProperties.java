@@ -14,13 +14,41 @@ import org.springframework.util.unit.DataSize;
  * @param allowedOrigins browser origins allowed by CORS
  * @param denyPattern    regex matched against the normalised public path; matches get a 404
  * @param docs           the private combined Swagger UI at /_docs (off by default)
+ * @param auth           JWT check for the /{service}/** routes (off by default)
  */
 @ConfigurationProperties(prefix = "gateway")
 public record GatewayProperties(
         Map<String, String> upstreams,
         List<String> allowedOrigins,
         String denyPattern,
-        @DefaultValue Docs docs) {
+        @DefaultValue Docs docs,
+        @DefaultValue Auth auth) {
+
+    /**
+     * Settings under "gateway.auth.".
+     *
+     * @param mode             off: no checks; report: log what would be rejected, never block;
+     *                         enforce: reject. Treated as off while jwtSecret is blank.
+     * @param jwtSecret        the HS256 secret identity-api signs with; set on the server only
+     * @param publicPaths      "METHOD /pattern" entries that need no token (METHOD may be ANY)
+     * @param roleRules        paths that need a role on top of a valid token
+     * @param clockSkewSeconds tolerance for exp/nbf
+     * @param stripRolePrefix  send "ADMIN" instead of "ROLE_ADMIN" in X-User-Role
+     */
+    public record Auth(
+            @DefaultValue("off") Mode mode,
+            @DefaultValue("") String jwtSecret,
+            @DefaultValue({}) List<String> publicPaths,
+            @DefaultValue({}) List<RoleRule> roleRules,
+            @DefaultValue("30") int clockSkewSeconds,
+            @DefaultValue("false") boolean stripRolePrefix) {
+
+        public enum Mode { OFF, REPORT, ENFORCE }
+
+        /** Any method on a path matching pattern requires role (e.g. ROLE_ADMIN). */
+        public record RoleRule(String pattern, String role) {
+        }
+    }
 
     /**
      * Settings under "gateway.docs.".
