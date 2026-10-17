@@ -105,9 +105,14 @@ class DocsEnabledTest {
         client.get().uri("/_docs").headers(h -> h.setBasicAuth(USER, PASS)).exchange()
                 .expectStatus().isFound()
                 .expectHeader().valueEquals(HttpHeaders.LOCATION, "/_docs/");
-        client.get().uri("/_docs/ui/swagger-ui-bundle.js").headers(h -> h.setBasicAuth(USER, PASS)).exchange()
+        // A small file, read in full: an unread multi-MB body keeps the server mid-write and
+        // makes graceful shutdown wait 30 s at the end of the test run.
+        String css = client.get().uri("/_docs/ui/index.css").headers(h -> h.setBasicAuth(USER, PASS)).exchange()
                 .expectStatus().isOk()
-                .expectHeader().valueEquals(HttpHeaders.CACHE_CONTROL, "no-store");
+                .expectHeader().valueEquals(HttpHeaders.CACHE_CONTROL, "no-store")
+                .expectHeader().contentTypeCompatibleWith("text/css")
+                .expectBody(String.class).returnResult().getResponseBody();
+        assertTrue(css != null && css.contains("box-sizing"));
         client.get().uri("/_docs/ui/swagger-ui.css").exchange()
                 .expectStatus().isUnauthorized();
         Map<?, ?> cfg = client.get().uri("/_docs/swagger-config").headers(h -> h.setBasicAuth(USER, PASS)).exchange()
@@ -121,10 +126,9 @@ class DocsEnabledTest {
 
     @Test
     void encodedDocsPathStillNeedsAuth() {
-        WebTestClient raw = WebTestClient.bindToServer().baseUrl("http://127.0.0.1:" + port).build();
-        raw.get().uri(URI.create("http://127.0.0.1:" + port + "/%5Fdocs/spec/garage")).exchange()
+        client.get().uri(URI.create("http://127.0.0.1:" + port + "/%5Fdocs/spec/garage")).exchange()
                 .expectStatus().isUnauthorized();
-        raw.get().uri(URI.create("http://127.0.0.1:" + port + "/_DOCS/spec/garage")).exchange()
+        client.get().uri(URI.create("http://127.0.0.1:" + port + "/_DOCS/spec/garage")).exchange()
                 .expectStatus().isUnauthorized();
     }
 

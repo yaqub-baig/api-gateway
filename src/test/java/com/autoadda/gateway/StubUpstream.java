@@ -1,7 +1,10 @@
 package com.autoadda.gateway;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 
@@ -17,7 +20,12 @@ final class StubUpstream {
     record Reply(int status, String json) {
     }
 
+    /** One received request: path (with query) and its headers, lower-cased names. */
+    record Seen(String path, Map<String, String> headers) {
+    }
+
     final List<String> seenPaths = new CopyOnWriteArrayList<>();
+    final List<Seen> seen = new CopyOnWriteArrayList<>();
     private final DisposableServer server;
 
     StubUpstream(Function<String, Reply> replies) {
@@ -27,6 +35,10 @@ final class StubUpstream {
                 .handle((req, res) -> {
                     String path = req.path().isEmpty() ? "/" : "/" + req.path();
                     seenPaths.add(path);
+                    Map<String, String> headers = new HashMap<>();
+                    req.requestHeaders().forEach(e -> headers.merge(
+                            e.getKey().toLowerCase(Locale.ROOT), e.getValue(), (a, b) -> a + "," + b));
+                    seen.add(new Seen(req.uri(), headers));
                     Reply r = replies.apply(path);
                     if (r == null) {
                         return res.status(HttpResponseStatus.NOT_FOUND).sendString(Mono.just("not found"));
@@ -36,6 +48,17 @@ final class StubUpstream {
                             .sendByteArray(Mono.just(r.json().getBytes(StandardCharsets.UTF_8)));
                 })
                 .bindNow();
+    }
+
+    /** The last request whose path starts with the given prefix, or null. */
+    Seen last(String pathPrefix) {
+        Seen found = null;
+        for (Seen s : seen) {
+            if (s.path().startsWith(pathPrefix)) {
+                found = s;
+            }
+        }
+        return found;
     }
 
     String baseUrl() {
