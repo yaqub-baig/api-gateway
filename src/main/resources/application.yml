@@ -119,6 +119,9 @@ gateway:
       - 'GET /part/api/v1/models/make/{id:\d+}'
       - GET /part/api/v1/products
       - POST /part/api/v1/products/search/paginated
+      # part: payment gateway webhook + browser redirect (called by the gateway, no JWT; webhook is HMAC-signed)
+      - POST /part/api/v1/payments/callback
+      - GET /part/api/v1/payments/callback
       # quote: everything in quote-api's BannerPublicController (banner ids are strings)
       - GET /quote/api/v1/banners
       - GET /quote/api/v1/banners/page/*
