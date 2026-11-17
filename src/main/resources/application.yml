@@ -109,16 +109,30 @@ gateway:
       # otherservice: category browsing
       - GET /otherservice/api/v1/service-categories
       - GET /otherservice/api/v1/service-categories/**
-      # part: catalogue and vehicle make/model pickers
+      # part: catalogue and vehicle make/model pickers (make / model ids are UUIDs)
       - GET /part/api/v1/categories/toplevelcategories
       - 'GET /part/api/v1/categories/{id:\d+}'
-      - 'GET /part/api/v1/engines/model/{id:\d+}'
+      - 'GET /part/api/v1/engines/model/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}'
       - GET /part/api/v1/makes
       - GET /part/api/v1/manufacturers
       - GET /part/api/v1/models
-      - 'GET /part/api/v1/models/make/{id:\d+}'
+      - 'GET /part/api/v1/models/make/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}'
+      - GET /part/api/v1/attributes
       - GET /part/api/v1/products
+      # part: website product search, read-only (GET /products/search, all products unpaged, stays private)
       - POST /part/api/v1/products/search/paginated
+      - POST /part/api/v1/products/search/advanced
+      - GET /part/api/v1/products/search/by-vehicle
+      - GET /part/api/v1/products/search/by-name
+      - GET /part/api/v1/products/search/by-part-number
+      - GET /part/api/v1/products/search/by-category
+      - GET /part/api/v1/products/search/by-manufacturer
+      - GET /part/api/v1/products/search/by-tag
+      - GET /part/api/v1/products/search/by-other-names
+      - 'GET /part/api/v1/products/search/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}'
+      - 'GET /part/api/v1/products/search/{id:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}}/suppliers'
+      # part: "N shops may have this" before a part enquiry (sending one needs a login)
+      - GET /part/api/v1/enquiries/matching-shops/count
       # part: payment gateway webhook + browser redirect (called by the gateway, no JWT; webhook is HMAC-signed)
       - POST /part/api/v1/payments/callback
       - GET /part/api/v1/payments/callback
