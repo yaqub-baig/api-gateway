@@ -44,7 +44,7 @@ gateway:
 
   # Matched (case-insensitive, unanchored at the end) against the normalised path.
   # Same rule as the Apache block-internal.conf, with the service prefix in front.
-  deny-pattern: "(?i)^/[^/]+/api/v1/(auth/(send-sms|send-email|update/role|remove/role)|notifications?/(send|test)|swagger-ui|v3/api-docs|actuator)"
+  deny-pattern: "(?i)^/[^/]+/api/v1/(auth/(send-sms|send-email|update/role|remove/role)|notifications?/(send|test)|addresses/internal|swagger-ui|v3/api-docs|actuator)"
 
   # Private combined Swagger UI at /_docs. OFF by default. Never put the password here;
   # enable it on the server with a separate config file (see README).
